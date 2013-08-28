@@ -1,0 +1,314 @@
+
+# Chp-8 位运算
+
+## 基本概念
+
+加法器  和  异或运算之间的关系
+
+### 与
+AND  &
+
+### 或
+OR  |
+
+### 非
+NOT  ~
+
+### 异或
+XOR  ^
+
+### 注意事项
+* Integer Promotion
+8bit -> 32bit
+
+* example
+(unsigned char)0xfc -> unsigned int 
+
+### 进制转换
+0xC = 0b1100 
+0xd = 1101
+0xe = 1110
+0xf = 1111
+0xa = 1010
+0xb = 1011
+
+### 错误辨析1
+char c;
+
+for (c = 0x00; c < 0xff; c++)
+
+为什么是一个无限循环？
+
+怎么修改正确？  （答案是 unsigned char c 或者 int c)
+提示： 从 127 + 1 = -128 所以会出问题。
+
+### 错误辨析2
+	if (0 & 1 == 0)
+		printf("c = %d\n", c);
+
+以上代码为何无法打印输出？
+
+## 移位运算
+左移操作 等价于 *2   低位（右边）补0
+右移操作 等价于 /2   高位（左边）补符号位
+
+所以 a / 16 等价于  a >> 4
+a % 16 等价于  a & 0x0F
+
+一般我们进行移位操作的时候，通常会强制类型转换为 unsigned     (unsigned)a >> n
+
+## 常用位操作
+
+### 设置位 set_bit(num, pos, 1)
+或操作，或 | 上 1, 1需要左移pos位
+
+	num = num | (1<<pos);
+	num |= ((unsigned)1<<pos);
+
+### 清除位 set_bit(num, pos, 0)   clear_bit(num, pos)
+与操作，与 & 上 0，1左移pos位然后取反
+
+	num = num & ~(1<<pos);
+	num &= ~((unsigned)1<<pos);
+
+### 测试位 = get_bit(num, pos)
+#### 判别是否为1
+* 写法1 if ((num & (1<<pos)) == (1<<pos))
+* 写法2 if (num & (1<<pos))
+
+#### 判别是否为0
+* 写法1 if ((num & (1<<pos)) == 0x0)
+* 写法2 if (!(num & (1<<pos)))
+
+### 设置位域 bit-field
+如果需要实现 从 pos 位开始的 len 个bit，设置为 value
+* 步骤1 与操作，与 & 上 0，从pos位开始len位都是1然后取反
+* 步骤2 或操作，或 | 上 value, value需要左移pos位
+
+例如 pos = 8, len = 4, value = 0b1011
+
+	num = num & ~(0b1111 << pos);
+	num = num | (value << pos);
+
+### 获取位域 bit-field
+例如，请实现对于一个 int 型变量 num 的 十六进制输出（也就是0x%x的方式输出)
+void put_int_hex(int num)
+
+## 课后作业
+### 求1-100里面有多少个9？
+### 请实现两个函数接口 void set_bit(num, pos, value) 和 int get_bit(num, pos)
+### 请实现位域函数接口 void set_bit_filed(num, pos, len, value)
+### 请参考 put_int_hex 的实现，完成 8进制的输出函数 void put_int_oct(int num)
+
+for (i = 10; i >= 0; i--)
+	put_oct(((unsigned)num >> (i*3)) & 0x7)
+
+
+https://github.com/limingth/NCCL
+
+
+# chp-9 指针基础
+
+## 预备知识
+
+### 计算机组成原理
+
+#### CPU内部结构
+* ALU 算术逻辑单元
+* Reg 寄存器
+* ID 指令译码器 (Instruction Decoder)
+* IB 指令缓冲器 (Instruction Buffer)
+* PC 程序计数器 (Program Counter)
+* Addr Bus 地址总线
+* Data Bus 数据总线
+* Control Unit 控制单元 （与Control Bus 控制总线相连）
+* LDR/STR 访存指令
+* MMU
+
+### 进程地址空间
+* cat /proc/pid/maps
+* cat /proc/kallsyms 
+
+#### 各个段的地址
+* 代码段 [text]
+* 数据段 [data]
+* 堆 [heap]
+* 栈 [stack]
+
+	&local = 0xbfffc01c
+	&global = 0x804a01c
+	&myconst = 0x8048620
+	&mystatic = 0x804a020
+	const string = 0x80487fd
+	malloc = 0x987a008
+	main = 0x8048454
+
+#### 进程的地址空间映射图
+----- 4G
+
+------ 3G
+             栈
+
+
+             堆
+             数据段
+             代码段
+------ 0G
+
+### 指针基础
+#### man ascii
+* hexdump -C hanzi.txt
+
+#### 重要结论
+如何看待指针变量？
+* 指针变量p更像是一个 int 整型变量i。而不是一个数组a[]。
+	- 指针是一个变量，存储的是一个地址，而这个地址是一个 int 整型数。指针变量占4个字节的存储，表示0-4G的虚拟地址。可以通过 (int) 强制转换为一个 int 整型数。
+	- 指针的值表示变量内存的起始地址，指针的类型决定*p要访问的内存单元的长度，而整型变量不能使用 *i 来访问内存。
+	- 指针变量存储的地址是有一定的取值范围（约束），而整型变量则可以任意。
+	- 指针变量的 +1 操作，是指向下一个同类型变量的内存单元的地址，而整型变量的 +1 操作，就是数值上加了1.
+	- 指针变量可以做 加/减运算，但不能作 乘/除运算，而整型变量都可以。
+	- 数组是连续的多个变量，指针是单个变量。
+	- 数组存储的是变量的值，指针存储的是某个变量的地址。
+	- 数组名不可以自增加和自减少 (a++/a--)，指针则可以 p++/p--/。
+	- 数组名可以做加/减运算(a+1)，指针也可以做 加/减运算(p+1)。
+	- 数组名和指针一样，在进行加减运算的基础上，还可以进行 *(a+1) / *(p+1)
+
+#### 反汇编工具
+* objdump -D a.out  反汇编
+
+#### 段错误是怎么产生的？
+* 原因1： 要访问（R/W）的内存地址（VA）在该进程中没有映射
+
+* 原因2： 要写入（W）的内存地址（VA）所在的页面是只读属性
+
+* 段错误不是给指针赋值（哪怕是错误值）所产生的，而是用 *p 去访问内存的时候才会产生段错误。
+
+* 给指针赋初始化的值，这个值的取值范围和方法(3种)是有一定约束的。
+	- 1. p = &a;   (int a;)
+	- 2. p = malloc(100);
+	- 3. p = array;   (int array[100];)
+	- 4. p = func;
+	- 5. p = old_p++;
+
+### 指针作为参数的传“址“调用 （vs 传值调用）
+
+### malloc
+
+#### NULL 不是 C语言的一个关键词 keyword，可以作为变量名。
+
+	#define NULL ((void *)0)
+ 
+int NULL； （ int while; )
+
+int a；
+
+akaedu@ubuntu:~/teacher_li/pointer$ find  /usr/include/ -name stddef.h
+/usr/include/linux/stddef.h
+akaedu@ubuntu:~/teacher_li/pointer$ vi /usr/include/linux/stddef.h 
+
+ 
+  6 #undef NULL
+  7 #if defined(__cplusplus)
+  8 #define NULL 0
+  9 #else
+ 10 #define NULL ((void *)0)
+ 11 #endif
+
+### malloc 的最大值
+ p = malloc(0x47100000);   可以
+ p = malloc(0x47200000);   不可以，返回 NULL
+
+### malloc 的最小值
+ p = malloc(0);		返回值不是 NULL，而是分配的 虚拟页面首地址+8
+最小的这个虚拟页面 heap 的空间，大约是 0x21000 = 132K
+
+#### alloca 的范围
+* bf9c4000-bf9d9000 [stack]
+
+size = 0x15000 约84k
+
+p = alloca(0x9f0000);	可以
+p = alloca(0xa00000);	不可以，返回 NULL，栈空间的最大值约为 10M
+
+栈的最大值：
+
+bf5a6000-bff99000 rw-p 00000000 00:00 0          [stack]
+
+局部变量分配在栈上，其中最大的数组大小可以是10M左右。
+
+ 10 #define N 0x9f0000
+ 11     char a[N];
+ 12     
+ 13     a[N-4] = 'a';
+
+全局变量的最大数组长度 0x10000000 是可以的，用 0x20000000 就几乎不可用了。
+ #define N 0x10000000
+ char a[N];
+
+最大长度和物理内存的大小有一定关系。
+
+## 课后作业
+### 用数组来解决约瑟夫环问题 Josephus 
+
+### 用数组来解决求素数问题 is_prime(int num); 
+
+# chp-10 字符串
+
+## 字符串的连接
+printf("hello, please"
+         "input a number:\n");
+
+## 对比 '\0' vs '0' vs 0 vs "0"
+* '\0': 1byte (0x00) char
+* '0' : 1byte (0x30) char
+*  0  : 4bytes (0x00000000) int
+* "0" : 2bytes (0x30 0x00) char *
+
+
+## 字符串作为参数传递时
+例如 printf("hello\n");
+等价于 printf(0x8048040);
+
+例如 printf("hello, this is a good boy\n");
+等价于 printf(0x8048140);
+
+char * p1 = "hello";
+char * p2 = "hello, this is a bad boy\n";
+
+这个赋值是可以的，允许的。
+char * p1;
+p1 = "hello";
+p1 = "world";
+
+这个赋值是不可以的，只能用 strcpy(str, "hello"); 给 str 数组赋值。
+char str[100];
+str = "hello";
+
+如果 我们用 
+char str[100];
+char * p;
+p = str;
+p = "hello";
+ strcpy(p, "world"); 
+
+但是如果改成
+char str[100];
+char * p;
+p = str;
+p = "hello";    ->   替换为 strcpy(p, "hello");  就可以了。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

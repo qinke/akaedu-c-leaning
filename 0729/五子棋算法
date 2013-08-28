@@ -1,0 +1,117 @@
+五子棋的核心算法
+
+五子棋是一种受大众广泛喜爱的游戏，其规则简单，变化多端，非常富有趣味性和消遣性。这里设计和实现了一个人机对下的五子棋程序，采用了博弈树的方法，应用了剪枝和最大最小树原理进行搜索发现最好的下子位置。介绍五子棋程序的数据结构、评分规则、胜负判断方法和搜索算法过程。 
+
+一、相关的数据结构 
+  关于盘面情况的表示，以链表形式表示当前盘面的情况，目的是可以允许用户进行悔棋、回退等操作。 
+  CList StepList; 
+  其中Step结构的表示为： 
+
+  struct Step 
+  { 
+   int m; //m,n表示两个坐标值 
+   int n; 
+   char side; //side表示下子方 
+  }; 
+以数组形式保存当前盘面的情况， 
+目的是为了在显示当前盘面情况时使用： 
+ char FiveArea[FIVE_MAX_LINE][FIVE_MAX_LINE]; 
+
+  其中FIVE_MAX_LINE表示盘面最大的行数。 
+
+  同时由于需要在递归搜索的过程中考虑时间和空间有效性，只找出就当前情况来说相对比较好的几个盘面，而不是对所有的可下子的位置都进行搜索，这里用变量CountList来表示当前搜索中可以选择的所有新的盘面情况对象的集合： 
+
+ CList CountList; 
+  其中类CBoardSituiton为: 
+ class CBoardSituation 
+ { 
+ CList StepList; //每一步的列表 
+ char FiveArea[FIVE_MAX_LINE][FIVE_MAX_LINE]; 
+ struct Step machineStep;  //机器所下的那一步 
+ double value; //该种盘面状态所得到的分数 
+} 
+
+二、评分规则 
+  对于下子的重要性评分，需要从六个位置来考虑当前棋局的情况，分别为：-,¦,/,\,//,\\ 
+
+实际上需要考虑在这六个位置上某一方所形成的子的布局的情况，对于在还没有子的地方落子以后的当前局面的评分，主要是为了说明在这个地方下子的重要性程度，设定了一个简单的规则来表示当前棋面对机器方的分数。 
+
+  基本的规则如下： 
+
+判断是否能成5, 如果是机器方的话给予100000分，如果是人方的话给予－100000 分； 
+判断是否能成活4或者是双死4或者是死4活3，如果是机器方的话给予10000分，如果是人方的话给予－10000分； 
+判断是否已成双活3，如果是机器方的话给予5000分，如果是人方的话给予－5000 分； 
+判断是否成死3活3，如果是机器方的话给予1000分，如果是人方的话给予－1000 分； 
+判断是否能成死4，如果是机器方的话给予500分，如果是人方的话给予－500分； 
+判断是否能成单活3，如果是机器方的话给予200分，如果是人方的话给予－200分； 
+判断是否已成双活2，如果是机器方的话给予100分，如果是人方的话给予－100分； 
+判断是否能成死3，如果是机器方的话给予50分，如果是人方的话给予－50分； 
+判断是否能成双活2，如果是机器方的话给予10分，如果是人方的话给予－10分； 
+判断是否能成活2，如果是机器方的话给予5分，如果是人方的话给予－5分； 
+判断是否能成死2，如果是机器方的话给予3分，如果是人方的话给予－3分。 
+
+  实际上对当前的局面按照上面的规则的顺序进行比较，如果满足某一条规则的话，就给该局面打分并保存，然后退出规则的匹配。注意这里的规则是根据一般的下棋规律的一个总结，在实际运行的时候，用户可以添加规则和对评分机制加以修正。 
+
+三、胜负判断 
+  实际上，是根据当前最后一个落子的情况来判断胜负的。实际上需要从四个位置判断，以该子为出发点的水平，竖直和两条分别为 45度角和135度角的线，目的是看在这四个方向是否最后落子的一方构成连续五个的棋子，如果是的话，就表示该盘棋局已经分出胜负。具体见下面的图示： 
+
+四、搜索算法实现描述 
+  注意下面的核心的算法中的变量currentBoardSituation，表示当前机器最新的盘面情况, CountList表示第一层子节点可以选择的较好的盘面的集合。核心的算法如下： 
+void MainDealFunction() 
+{ 
+ value=－MAXINT; //对初始根节点的value赋值 
+CalSeveralGoodPlace(currentBoardSituation,CountList); 
+//该函数是根据当前的盘面情况来比较得到比较好的可以考虑的几个盘面的情况，可以根据实际的得分情况选取分数比较高的几个盘面，也就是说在第一层节点选择的时候采用贪婪算法，直接找出相对分数比较高的几个形成第一层节点，目的是为了提高搜索速度和防止堆栈溢出。 
+pos=CountList.GetHeadPosition(); 
+CBoardSituation＊ pBoard; 
+for(i=0;ivalue=Search(pBoard,min,value,0); 
+ Value=Select(value,pBoard－>value,max);  
+ //取value和pBoard－>value中大的赋给根节点 
+} 
+for(i=0;ivalue)  
+//找出那一个得到最高分的盘面 
+ { 
+  currentBoardSituation=pBoard; 
+  PlayerMode=min; //当前下子方改为人 
+  Break; 
+ } 
+} 
+
+  其中对于Search函数的表示如下：实际上核心的算法是一个剪枝过程，其中在这个搜索过程中相关的四个参数为：（1）当前棋局情况；（2）当前的下子方，可以是机器(max)或者是人(min)；（3）父节点的值oldValue；（4）当前的搜索深度depth。 
+
+double Search(CBoardSituation＆ 
+board,int mode,double oldvalue,int depth) 
+{ 
+ CList m_DeepList; 
+ if(deptholdvalue))==  TRUE) 
+   { 
+     if(mode==max) 
+      value=select(value,search(successor 
+     Board,min,value,depth＋1),max); 
+     else 
+      value=select(value,search(successor 
+      Board,max,value,depth＋1),min); 
+   } 
+   return value; 
+ } 
+ else 
+ { 
+if ( goal(board)<>0)  
+//这里goal(board)<>0表示已经可以分出胜负 
+ return goal(board); 
+else 
+ return evlation(board); 
+    } 
+  } 
+
+  注意这里的goal(board)函数是用来判断当前盘面是否可以分出胜负，而evlation(board)是对当前的盘面从机器的角度进行打分。 
+
+  下面是Select函数的介绍，这个函数的主要目的是根据 PlayerMode情况，即是机器还是用户来返回节点的应有的值。 
+
+double Select(double a,double b,int mode) 
+{ 
+ if(a>b ＆＆ mode==max)¦¦ (a< b ＆＆ mode==min) 
+return a; 
+ else 
+return b; 
+} 
